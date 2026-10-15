@@ -67,3 +67,49 @@ initialize through the maintenance database first.
 - Health check uses `/docs` deliberately: it must NOT touch the database, so Neon
   can suspend between real memory operations and stay inside its 100 CU-hour
   free-tier budget.
+
+## Updating from upstream mem0
+
+Two independent tracks — most upstream releases only touch the first.
+
+### 1. The `mem0ai` engine (Python SDK, installed from PyPI)
+
+The memory logic (fact extraction, embeddings, pgvector/Gemini providers) lives
+in the SDK; the REST wrapper is thin. `server/requirements.txt` pins the engine
+(currently `mem0ai==2.2.1` — the version verified by the smoke test), so updates
+are deliberate instead of surprise-breaking your next redeploy:
+
+```bash
+# 1. bump the pin in server/requirements.txt:  mem0ai==X.Y.Z
+bash scripts/smoke-test.sh          # full local Docker test (requires Docker)
+git commit -am "Bump mem0ai to X.Y.Z"
+git push                            # Render auto-deploys from main
+```
+
+### 2. The REST wrapper (`server/` directory)
+
+`server/` is a copy of upstream `mem0/server/` with a handful of local patches
+(see `git log -- server/`). To sync new wrapper code without losing them:
+
+```bash
+git fetch --depth 1 upstream main:refs/remotes/upstream/main   # remote already configured
+git diff --stat HEAD upstream/main -- server/                  # what differs
+
+# a) files WITHOUT local patches can be taken wholesale:
+git checkout upstream/main -- server/<path>
+
+# b) files WITH local patches — merge by hand:
+#    server/main.py            GOOGLE_API_KEY -> gemini auto-select, sslmode
+#                              passthrough, 768-dim defaults
+#    server/db.py              URL-escaped credentials + sslmode query param
+#    server/Dockerfile         /app/history dir, alembic-on-boot CMD, $PORT
+#    server/requirements.txt   google-genai (not google-generativeai), mem0ai pin
+#    server/alembic/env.py     % escaping for the app-DB URL
+#    server/.env.example       local-dev sslmode note
+```
+
+- Upstream alembic migrations (`server/alembic/versions/`) arrive with the sync
+  and run automatically on boot (`alembic upgrade head`) — schema updates are free.
+- After any sync or pin bump: `bash scripts/smoke-test.sh`, then push.
+- Pushes to `main` redeploy the service (Render blueprint default). If it doesn't,
+  service dashboard → Manual Deploy → Clear build cache & deploy.
