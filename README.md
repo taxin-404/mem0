@@ -158,3 +158,7 @@ environment block in `~/.config/opencode/opencode.json`:
 ```
 
 The key never lives in the repo or in the MCP config itself.
+
+Want this on another machine or in a different agent (Claude Code, Cursor, …)?
+Copy the one-shot prompt from `mcp/AGENT-SETUP.md` into that agent — it
+performs the whole setup from scratch.

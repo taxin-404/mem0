@@ -26,7 +26,7 @@ def _load_api_key() -> str:
     if key := os.environ.get("MEM0_API_KEY"):
         return key
     key_file = os.environ.get(
-        "MEM0_API_KEY_FILE", os.path.expanduser("~/.config/opencode/mem0-api-key")
+        "MEM0_API_KEY_FILE", os.path.expanduser("~/.config/mem0/mem0-api-key")
     )
     with open(key_file) as f:
         return f.read().strip()
