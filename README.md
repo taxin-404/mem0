@@ -70,7 +70,25 @@ initialize through the maintenance database first.
 
 ## Updating from upstream mem0
 
-Two independent tracks — most upstream releases only touch the first.
+Updates are **automatic**. A scheduled GitHub Action
+(`.github/workflows/auto-update.yml` — every Monday, plus on-demand from the
+Actions tab) will:
+
+1. bump the pinned `mem0ai` SDK when PyPI has a newer release,
+2. take upstream's version of any `server/` file this fork never patched,
+3. run the full Docker smoke test — updates are only pushed if it passes.
+   Pushes to `main` trigger a Render deploy, and a failed deploy leaves the
+   previous version serving,
+4. open a GitHub issue when upstream changed one of the six hand-patched
+   files below — those are never auto-merged; the issue walks through the
+   manual merge, and `scripts/update-manifest.sh` records the merge so the
+   alert stops recurring.
+
+If an auto-update ever breaks something: the old Render deploy keeps serving
+until a good one succeeds — `git revert` the auto commit (or ask) and push.
+
+The rest of this section is what the Action automates, kept as the manual
+reference.
 
 ### 1. The `mem0ai` engine (Python SDK, installed from PyPI)
 

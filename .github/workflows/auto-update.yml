@@ -1,0 +1,122 @@
+name: Auto-update from upstream mem0
+
+# Keeps this fork in sync with upstream mem0 (github.com/mem0ai/mem0):
+#   1. bumps the pinned `mem0ai` SDK in server/requirements.txt when PyPI has a
+#      newer release,
+#   2. takes upstream's version of server/ files we never patched,
+#   3. runs the full Docker smoke test,
+#   4. pushes to main only if everything passed (Render auto-deploys from main;
+#      a failed Render deploy leaves the previous version serving),
+#   5. opens/updates a GitHub issue when upstream changed one of our 6
+#      hand-patched files — those need a human merge and are never auto-touched.
+# See README "Updating from upstream mem0".
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC (13:00 ICT)
+  workflow_dispatch: {}
+
+concurrency:
+  group: auto-update
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      PATCHED_FILES: server/main.py server/db.py server/Dockerfile server/requirements.txt server/alembic/env.py server/.env.example
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for a newer mem0ai SDK release
+        id: sdk
+        run: |
+          current=$(grep -oP '^mem0ai==\K[0-9][0-9a-zA-Z.+-]*' server/requirements.txt)
+          latest=$(curl -fsS https://pypi.org/pypi/mem0ai/json | python3 -c 'import sys,json;print(json.load(sys.stdin)["info"]["version"])')
+          echo "pinned: $current   latest on PyPI: $latest"
+          if [ "$current" != "$latest" ]; then
+            sed -i "s/^mem0ai==.*/mem0ai==$latest/" server/requirements.txt
+            echo "bumped=$latest" >> "$GITHUB_OUTPUT"
+          else
+            echo "bumped=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Sync non-patched server/ files from upstream
+        id: sync
+        run: |
+          git remote add upstream https://github.com/mem0ai/mem0.git
+          git fetch --depth 1 upstream main:refs/remotes/upstream/main
+
+          # 1. files we never patched: take upstream wholesale (adds/modifies/removes)
+          while read -r status path; do
+            [ -z "${path:-}" ] && continue
+            skip=""
+            for p in $PATCHED_FILES; do [ "$path" = "$p" ] && skip=1 && break; done
+            [ -n "$skip" ] && continue
+            echo "syncing (unpatched): $status $path"
+            case "$status" in
+              D) git rm -q -- "$path" ;;
+              *) git checkout upstream/main -- "$path" ;;
+            esac
+          done < <(git diff --name-status HEAD upstream/main -- server/)
+
+          # 2. hand-patched files: compare upstream's blob against the recorded
+          #    pre-patch state (server/.upstream-manifest) -> flag for humans
+          flagged=""
+          while read -r sha path; do
+            [ -z "${path:-}" ] && continue
+            up=$(git rev-parse "upstream/main:$path" 2>/dev/null || echo MISSING)
+            if [ "$up" != "$sha" ]; then
+              flagged="$flagged
+            - $path"
+            fi
+          done < server/.upstream-manifest
+          if [ -n "$flagged" ]; then
+            { echo "flagged<<EOF"; echo "$flagged"; echo "EOF"; } >> "$GITHUB_OUTPUT"
+            echo "upstream changed hand-patched files:$flagged"
+          else
+            echo "flagged=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run the Docker smoke test
+        run: bash scripts/smoke-test.sh
+
+      - name: Commit and push to main (Render auto-deploys)
+        run: |
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "nothing to update"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          msg="chore(auto-update): mem0ai ${{ steps.sdk.outputs.bumped }}"
+          [ "${{ steps.sdk.outputs.bumped }}" = "" ] && msg="chore(auto-update): sync server/ from upstream"
+          git commit -m "$msg (smoke-tested)"
+          git push
+
+      - name: Alert on hand-patched files needing a human merge
+        if: steps.sync.outputs.flagged != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FLAGGED: ${{ steps.sync.outputs.flagged }}
+        run: |
+          title="Upstream mem0 changed hand-patched files — manual merge needed"
+          open=$(gh issue list --state open --search "\"$title\" in:title" --json number -q '.[0].number' || true)
+          body="The scheduled auto-update synced everything it safely could, but upstream mem0 also changed files that carry local patches:$FLAGGED
+
+          What to do:
+          1. For each file: \`git diff HEAD upstream/main -- <file>\` (after \`git fetch --depth 1 upstream main:refs/remotes/upstream/main\` and adding the upstream remote) to see upstream's changes.
+          2. Merge by hand, keeping the local changes listed in README \"Updating from upstream mem0\".
+          3. Run \`bash scripts/update-manifest.sh\` and commit — that records the new upstream state so this alert stops recurring.
+          4. \`bash scripts/smoke-test.sh\`, then push (Render redeploys automatically)."
+          if [ -n "$open" ]; then
+            gh issue comment "$open" --body "New detection on $(date -u +%F):$FLAGGED"
+          else
+            gh issue create --title "$title" --body "$body"
+          fi
