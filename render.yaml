@@ -32,3 +32,5 @@ services:
         value: "false"
       - key: MEM0_TELEMETRY
         value: "false"
+      - key: POSTGRES_SSLMODE
+        value: require # Neon rejects plaintext connections
