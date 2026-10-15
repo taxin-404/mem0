@@ -1,0 +1,11 @@
+# Never commit credentials (server AGENTS.md rule)
+.env
+server/.env
+
+# Python
+__pycache__/
+*.pyc
+
+# Local history database
+history/
+server/history/

@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: mem0-api
+    runtime: docker
+    region: singapore
+    plan: free
+    dockerfilePath: ./server/Dockerfile
+    dockerContext: ./server
+    healthCheckPath: /docs
+    envVars:
+      # --- Secrets: prompted once in the Dashboard at Blueprint creation ---
+      - key: JWT_SECRET
+        generateValue: true # platform-generated, never committed
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: POSTGRES_HOST
+        sync: false # Neon direct endpoint, e.g. ep-xxx.region.neon.tech
+      - key: POSTGRES_USER
+        sync: false # e.g. neondb_owner
+      - key: POSTGRES_PASSWORD
+        sync: false
+      # --- Non-sensitive configuration ---
+      - key: POSTGRES_PORT
+        value: "5432"
+      - key: POSTGRES_DB
+        value: neondb # pgvector storage database (see README for Neon SQL prerequisites)
+      - key: POSTGRES_COLLECTION_NAME
+        value: memories
+      - key: APP_DB_NAME
+        value: mem0_app # auth / API keys / audit log (must exist before first boot)
+      - key: AUTH_DISABLED
+        value: "false"
+      - key: MEM0_TELEMETRY
+        value: "false"
