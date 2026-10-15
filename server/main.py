@@ -18,7 +18,7 @@ from errors import (
 )
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from models import RequestLog, User
 from pydantic import BaseModel, Field
 from rate_limit import limiter
@@ -585,3 +585,13 @@ def reset_memory(_auth=Depends(require_admin)):
 def home():
     """Redirect to the OpenAPI documentation."""
     return RedirectResponse(url="/docs")
+
+
+@app.head("/", summary="Health probe", include_in_schema=False)
+@app.head("/docs", summary="Health probe", include_in_schema=False)
+def health_probe():
+    """Answer uptime health probes that use HEAD (Render, UptimeRobot, ...).
+    GET / redirects to /docs, but HEAD has no body to redirect, so probes get
+    a bare 200. Must never touch the database, so free-tier DBs can suspend
+    between real memory operations."""
+    return Response(status_code=200)

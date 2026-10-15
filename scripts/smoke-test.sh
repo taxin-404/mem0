@@ -74,6 +74,10 @@ m_code="$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8899/memories)
 echo "GET /docs               -> $d_code   (expect 200, Render health check path)"
 echo "GET /auth/setup-status  -> $s_body   (expect 200 JSON)"
 echo "GET /memories (no auth) -> $m_code   (expect 401/403, auth enforced)"
+h_root="$(curl -s -o /dev/null -w '%{http_code}' -I http://127.0.0.1:8899/)"
+h_docs="$(curl -s -o /dev/null -w '%{http_code}' -I http://127.0.0.1:8899/docs)"
+echo "HEAD /                  -> $h_root   (expect 200, uptime probes e.g. UptimeRobot)"
+echo "HEAD /docs              -> $h_docs   (expect 200, uptime probes)"
 
 echo
 echo "=== 6. DATABASE STATE ==="
