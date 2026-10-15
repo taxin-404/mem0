@@ -9,3 +9,6 @@ __pycache__/
 # Local history database
 history/
 server/history/
+
+# MCP bridge virtualenv
+mcp/.venv/

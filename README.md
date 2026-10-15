@@ -131,3 +131,30 @@ git checkout upstream/main -- server/<path>
 - After any sync or pin bump: `bash scripts/smoke-test.sh`, then push.
 - Pushes to `main` redeploy the service (Render blueprint default). If it doesn't,
   service dashboard → Manual Deploy → Clear build cache & deploy.
+
+## MCP bridge (AI-agent memory)
+
+`mcp/server.py` wraps this server's REST API as MCP tools (`add_memory`,
+`search_memory`, `list_memories`, `delete_memory`) so coding agents (OpenCode,
+Claude Code, Cursor…) get durable memory across sessions — backed by this
+deployment's Gemini + Neon stack. Setup once per machine:
+
+```bash
+cd mcp && python3 -m venv .venv && .venv/bin/pip install "mcp<2" httpx
+opencode mcp add mem0 --global -- "$PWD/.venv/bin/python" "$PWD/server.py"
+```
+
+Auth: create a key on the server (`POST /api-keys`, label e.g.
+`opencode-mem0-mcp`), store the returned `m0sk_...` value in
+`~/.config/opencode/mem0-api-key` (chmod 600), and give the server entry this
+environment block in `~/.config/opencode/opencode.json`:
+
+```jsonc
+"environment": {
+  "MEM0_API_KEY_FILE": "/home/<you>/.config/opencode/mem0-api-key",
+  "MEM0_API_URL": "https://<your-render-service>.onrender.com",
+  "MEM0_USER_ID": "<memory scope, e.g. your name>"
+}
+```
+
+The key never lives in the repo or in the MCP config itself.
