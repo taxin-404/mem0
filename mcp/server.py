@@ -92,6 +92,14 @@ def list_memories() -> str:
 
 
 @mcp.tool()
+def update_memory(memory_id: str, content: str) -> str:
+    """Rewrite an existing memory in place — use when a stored fact is wrong
+    or outdated (get ids from search_memory or list_memories)."""
+    _request("PUT", f"/memories/{memory_id}", json={"text": content})
+    return f"Updated memory {memory_id}."
+
+
+@mcp.tool()
 def delete_memory(memory_id: str) -> str:
     """Delete a memory by its id (use ids returned by search_memory or list_memories)."""
     _request("DELETE", f"/memories/{memory_id}")
