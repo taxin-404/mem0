@@ -30,6 +30,7 @@ jobs:
     timeout-minutes: 25
     env:
       PATCHED_FILES: server/main.py server/db.py server/Dockerfile server/requirements.txt server/alembic/env.py server/.env.example
+      FORK_ONLY: server/.upstream-manifest
     steps:
       - uses: actions/checkout@v4
 
@@ -56,7 +57,7 @@ jobs:
           while read -r status path; do
             [ -z "${path:-}" ] && continue
             skip=""
-            for p in $PATCHED_FILES; do [ "$path" = "$p" ] && skip=1 && break; done
+            for p in $PATCHED_FILES $FORK_ONLY; do [ "$path" = "$p" ] && skip=1 && break; done
             [ -n "$skip" ] && continue
             echo "syncing (unpatched): $status $path"
             case "$status" in
