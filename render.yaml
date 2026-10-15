@@ -11,8 +11,8 @@ services:
       # --- Secrets: prompted once in the Dashboard at Blueprint creation ---
       - key: JWT_SECRET
         generateValue: true # platform-generated, never committed
-      - key: OPENAI_API_KEY
-        sync: false
+      - key: GOOGLE_API_KEY
+        sync: false # free key from https://aistudio.google.com/apikey (no credit card)
       - key: POSTGRES_HOST
         sync: false # Neon direct endpoint, e.g. ep-xxx.region.neon.tech
       - key: POSTGRES_USER

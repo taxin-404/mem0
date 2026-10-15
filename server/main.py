@@ -113,9 +113,30 @@ POSTGRES_PASSWORD = os.environ.get("POSTGRES_PASSWORD", "postgres")
 POSTGRES_COLLECTION_NAME = os.environ.get("POSTGRES_COLLECTION_NAME", "memories")
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "").strip()
 HISTORY_DB_PATH = os.environ.get("HISTORY_DB_PATH", "/app/history/history.db")
-DEFAULT_LLM_MODEL = os.environ.get("MEM0_DEFAULT_LLM_MODEL", "gpt-5-mini")
-DEFAULT_EMBEDDER_MODEL = os.environ.get("MEM0_DEFAULT_EMBEDDER_MODEL", "text-embedding-3-small")
+
+# LLM/embedder provider selection:
+#   GOOGLE_API_KEY set -> Gemini for both LLM and embedder (free AI Studio tier,
+#                         default models are free-tier eligible)
+#   otherwise          -> OpenAI (legacy default)
+# EMBEDDING_DIMS must match the pgvector column size (see README SQL).
+if GOOGLE_API_KEY:
+    LLM_PROVIDER = "gemini"
+    EMBEDDER_PROVIDER = "gemini"
+    LLM_API_KEY = GOOGLE_API_KEY
+    EMBEDDER_API_KEY = GOOGLE_API_KEY
+    DEFAULT_LLM_MODEL = os.environ.get("MEM0_DEFAULT_LLM_MODEL", "gemini-3.5-flash-lite")
+    DEFAULT_EMBEDDER_MODEL = os.environ.get("MEM0_DEFAULT_EMBEDDER_MODEL", "models/gemini-embedding-001")
+    EMBEDDING_DIMS = 768
+else:
+    LLM_PROVIDER = "openai"
+    EMBEDDER_PROVIDER = "openai"
+    LLM_API_KEY = OPENAI_API_KEY
+    EMBEDDER_API_KEY = OPENAI_API_KEY
+    DEFAULT_LLM_MODEL = os.environ.get("MEM0_DEFAULT_LLM_MODEL", "gpt-5-mini")
+    DEFAULT_EMBEDDER_MODEL = os.environ.get("MEM0_DEFAULT_EMBEDDER_MODEL", "text-embedding-3-small")
+    EMBEDDING_DIMS = 1536
 
 DEFAULT_CONFIG = {
     "version": "v1.1",
@@ -128,13 +149,17 @@ DEFAULT_CONFIG = {
             "user": POSTGRES_USER,
             "password": POSTGRES_PASSWORD,
             "collection_name": POSTGRES_COLLECTION_NAME,
+            "embedding_model_dims": EMBEDDING_DIMS,
         },
     },
     "llm": {
-        "provider": "openai",
-        "config": {"api_key": OPENAI_API_KEY, "temperature": 0.2, "model": DEFAULT_LLM_MODEL},
+        "provider": LLM_PROVIDER,
+        "config": {"api_key": LLM_API_KEY, "temperature": 0.2, "model": DEFAULT_LLM_MODEL},
     },
-    "embedder": {"provider": "openai", "config": {"api_key": OPENAI_API_KEY, "model": DEFAULT_EMBEDDER_MODEL}},
+    "embedder": {
+        "provider": EMBEDDER_PROVIDER,
+        "config": {"api_key": EMBEDDER_API_KEY, "model": DEFAULT_EMBEDDER_MODEL, "embedding_dims": EMBEDDING_DIMS},
+    },
     "history_db_path": HISTORY_DB_PATH,
 }
 

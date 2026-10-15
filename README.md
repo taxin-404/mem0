@@ -19,7 +19,7 @@ In the Neon Dashboard → SQL editor (database selected: `neondb`):
 CREATE EXTENSION IF NOT EXISTS vector;
 CREATE TABLE IF NOT EXISTS memories (
   id UUID PRIMARY KEY,
-  vector vector(1536), -- text-embedding-3-small dimensions
+  vector vector(768), -- gemini-embedding-001 dimensions (768)
   payload JSONB
 );
 
@@ -39,7 +39,11 @@ initialize through the maintenance database first.
    - `POSTGRES_HOST` — Neon **Direct** endpoint host (NOT the `-pooler` one), no `https://`
    - `POSTGRES_USER` — `neondb_owner`
    - `POSTGRES_PASSWORD` — your Neon password
-   - `OPENAI_API_KEY`
+   - `GOOGLE_API_KEY` — free Gemini key from
+     [AI Studio](https://aistudio.google.com/apikey) (no credit card needed).
+     Setting this key auto-selects the Gemini provider for both LLM and
+     embeddings: `gemini-3.5-flash-lite` + `models/gemini-embedding-001`,
+     both free-tier eligible.
    - `JWT_SECRET` — auto-generated, no action needed
 4. Apply, watch the first deploy, check logs.
 
